@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="2c3dba7a-7baa-4cd5-992b-959c526a477d" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" database="${db.data}" user="${db.username}"/>
+	</db:config>
+	<configuration-properties doc:name="Configuration properties" doc:id="f1017650-434e-47fd-bef1-5c23bc368c38" file="config.yaml" />
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="1d1f63d5-3aef-48ee-8d60-1f1b556b45ab" >
+		<salesforce:basic-connection username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}" />
+	</salesforce:sfdc-config>
+	<configuration doc:name="Configuration" doc:id="3a8b7f35-b30f-4d03-a32f-b7de4fbe9cc6" defaultErrorHandler-ref="globalError_Handler" />
+	<error-handler name="globalError_Handler" doc:id="b4e06174-9410-4108-91c9-dd942ebd7888" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="551fb1bb-e47e-43da-92d2-0857fed73305" >
+			<set-payload value='#[{"error":error.description}]' doc:name="Set Payload" doc:id="1793702d-c293-420b-b2ea-ffd23fa93d41" />
+		</on-error-propagate>
+	</error-handler>
+</mule>

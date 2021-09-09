@@ -1,0 +1,10 @@
+db:
+  host: "localhost"
+  port: "3306"
+  data: "test"
+  username: "root"
+  
+sfdc:
+  username: "abilash.test@apisero.com"
+  password: "Abilash74743#"
+  token: "nPFALrrwmghSxoK7mcfU1GNZ"

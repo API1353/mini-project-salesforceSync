@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="salesforcesyncFlow" doc:id="e84ef2cd-01a5-452b-8fea-97f97d91e2fe">
+		<db:listener doc:name="On Table Row" doc:id="102d729d-e240-4dc2-8c6e-89f00af233b7" config-ref="Database_Config" table="customer" watermarkColumn="modified_date">
+			<scheduling-strategy >
+				<fixed-frequency/>
+			</scheduling-strategy>
+		</db:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="ccb7caea-ff0f-4955-93e0-c3e4894a02af" message="#[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="66f8590e-a939-43e0-8225-c06d4be8b122" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	
+	Name: payload.name,
+	user_id__c: payload.user_id,
+	name__c: payload.name,
+	email__c: payload.email,
+	place__c: payload.place
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:upsert doc:name="Upsert" doc:id="bffd6461-41bd-4f99-bba5-c7887221535d" config-ref="Salesforce_Config" objectType="customer__c" externalIdFieldName="user_id__c"/>
+		<logger level="INFO" doc:name="Logger" doc:id="6e6068eb-a4bd-4879-9cef-eee165a17d41" message="#[payload]"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="5e1b8e15-38c8-4966-8ecc-0e64142ae07e" type="SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT, SALESFORCE:LIMIT_EXCEEDED">
+				<set-payload value='#[{"Error":error.description}]' doc:name="Set Payload" doc:id="2085ec72-a17f-4a00-b3d2-adfa44206ad4" />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="salesforcesyncFlow1" doc:id="9aace5bd-382d-45fd-907f-573d2e88d2f4">
+		<scheduler doc:name="Scheduler" doc:id="47eee1fd-9224-4d8b-aaeb-c0c88c42d5c9" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="30" timeUnit="SECONDS"/>
+			</scheduling-strategy>
+		</scheduler>
+		<db:select doc:name="Select" doc:id="caec6b59-b806-46d9-b1c7-71a9d6904079" config-ref="Database_Config">
+			<db:sql ><![CDATA[select user_id from deleted_records]]></db:sql>
+		</db:select>
+		<logger level="INFO" doc:name="Logger" doc:id="49195ee8-a324-41ce-9085-29ca9295189b" />
+		<choice doc:name="Choice" doc:id="5e7307e9-b52b-461f-a320-69235c0d68b3" >
+			<when expression="#[sizeOf(payload) != 0]">
+				<foreach doc:name="For Each" doc:id="0d454461-4aff-443c-924c-ed1a46de606f">
+			<salesforce:query doc:name="Query" doc:id="9ebf96ea-df0f-4a0d-885e-d488b2569214" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query><![CDATA[select Id from customer__c where user_id__c = :id]]></salesforce:salesforce-query>
+			<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"id" : payload.user_id
+}]]]></salesforce:parameters>
+		</salesforce:query>
+			<logger level="INFO" doc:name="Logger" doc:id="0cfd094d-37bd-42b8-8ae3-ed71e8daa1d6" message="#[payload]" />
+			<try doc:name="Try" doc:id="72c99a4e-a250-43b2-b39c-9de839ae7cad" >
+						<salesforce:delete doc:name="Delete" doc:id="0e1c35b1-73b0-4f19-b519-aecd38ee7526" config-ref="Salesforce_Config">
+				<salesforce:ids><![CDATA[#[payload.Id]]]></salesforce:ids>
+			</salesforce:delete>
+						<error-handler >
+							<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="8a720f3a-c598-4648-bb1d-06025f97cd73" type="SALESFORCE:INVALID_INPUT">
+								<set-payload value='#[{"error":"Invalid Input"}]' doc:name="Set Payload" doc:id="ad97d28b-bc8c-4898-968c-ce7334ce29fb" />
+							</on-error-propagate>
+						</error-handler>
+					</try>
+			<logger level="INFO" doc:name="Logger" doc:id="88865265-b119-4f7e-a9e7-73d18c507ad8" message="#[payload]" />
+		</foreach>
+				<logger level="INFO" doc:name="Logger" doc:id="d058b64a-dcd1-4ab1-8388-6088460ac406" />
+				<db:bulk-delete doc:name="Bulk delete" doc:id="4afd9439-04de-4f98-85f2-9d5c9afffff5" config-ref="Database_Config">
+			<db:sql><![CDATA[delete from deleted_records where user_id = :user_id]]></db:sql>
+		</db:bulk-delete>
+				<logger level="INFO" doc:name="Logger" doc:id="c49c9965-c7f9-41ac-ab34-527136c102c5" message="#[payload]"/>
+			</when>
+			<otherwise >
+				<set-payload value='#[{"message": "Nothing to delete"}]' doc:name="Set Payload" doc:id="c77f53db-3808-44cd-814c-ebb65a81e6a2" />
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="Logger" doc:id="a8d8b131-89ce-49e1-9eba-78c93bb90869" message="#[payload]"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="d54ff56a-55a6-4d24-b6fa-350d55e9a054" type="DB:BAD_SQL_SYNTAX, DB:CONNECTIVITY, DB:QUERY_EXECUTION, DB:RETRY_EXHAUSTED, SALESFORCE:LIMIT_EXCEEDED, SALESFORCE:TIMEOUT">
+				<set-payload value='#[{"error":error.description}]' doc:name="Set Payload" doc:id="a189c371-f667-47ab-8f57-13aca812904e" />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>
