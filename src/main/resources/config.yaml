@@ -1,0 +1,15 @@
+db:
+  host: "localhost"
+  port: "3306"
+  user: "root"
+  database: "minipro"
+  
+http:
+  port: "8081"
+  
+sfdc:
+  username: "kas@que.com"
+  password: "Leeminho789@"
+  token: "Ho4XzqscjhHrSTowTTybbGbP0"  
+  
+  

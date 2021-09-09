@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<configuration-properties doc:name="Configuration properties" doc:id="c4c01532-1bd2-4de0-b227-907568d00c96" file="config.yaml" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="cdafcf86-2261-4861-a9a8-e4356e6c159c" >
+		<db:my-sql-connection host="${db.host}" port="${db.port}" user="${db.user}" database="${db.database}" />
+	</db:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="6f456b46-5b4d-4f14-8d11-78fe5db7415e" >
+		<http:listener-connection host="localhost" port="${http.port}" />
+	</http:listener-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="c7d28f45-e8fc-4e66-9660-19f2c76ea83c" >
+		<salesforce:basic-connection username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.token}" />
+	</salesforce:sfdc-config>
+	<configuration doc:name="Configuration" doc:id="76ccfbfa-9f9d-4eb2-af13-a745bedc91a1" defaultErrorHandler-ref="globalError_Handler" />
+	<error-handler name="globalError_Handler" doc:id="577e74f1-3b8b-4a5d-b4ae-3a2de443c2d7" >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="e1900d5a-769b-4273-a16f-4372ff2d915d" type="ANY">
+			<set-payload value="#[error.description]" doc:name="Set Payload" doc:id="0a93f92c-267d-44d6-9d2c-756636c42b0e" />
+		</on-error-continue>
+	</error-handler>
+</mule>

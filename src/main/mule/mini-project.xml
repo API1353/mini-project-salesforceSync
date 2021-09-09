@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<flow name="mini-projectFlow" doc:id="02dd8abd-f773-435d-b929-1c716615db60">
+		<db:listener table="employees" doc:name="On Table Row" doc:id="a0e918c7-aa56-48ae-88cb-e8e32ec01547" config-ref="Database_Config" watermarkColumn="Modified_Date">
+			<scheduling-strategy >
+				<fixed-frequency/>
+			</scheduling-strategy>
+		</db:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="c3977560-899d-4ee2-a81e-d6bcfbd63cb9" message="#[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="bfcfb45c-bc76-41d7-ae29-6c211177bf46" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Name: payload.E_NAME,
+	E_Phone__c: payload.E_Phone,
+	E_DEPT__c: payload.E_DEP,
+	E_ID__c: payload.E_ID
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:upsert objectType="Employee__c" doc:name="Upsert" doc:id="76ae2afc-f378-441a-a110-911659254a4c" config-ref="Salesforce_Config" externalIdFieldName="E_ID__c"/>
+		<logger level="INFO" doc:name="Logger" doc:id="ba95e785-149d-4cbd-89c1-c311aa29f97f" message="#[payload]"/>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="2276c903-1fd9-42bf-a7e8-2a7007b9e541" type="SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT, SALESFORCE:LIMIT_EXCEEDED">
+				<set-payload value="#[error.description]" doc:name="Set Payload" doc:id="f457c992-3090-460e-ab6f-8291e5b8b2ae" />
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="a8999249-9633-4dd8-a1ee-6eb227ac9461" type="ANY">
+				<set-payload value="#[error.description]" doc:name="Set Payload" doc:id="04447fea-f068-4223-98dd-9306b36c51d2" />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="mini-projectFlow1" doc:id="9c9b0bd1-e7ca-41cd-ad50-2534df8fb2e5">
+		<scheduler doc:name="Scheduler" doc:id="01b14941-956d-480c-8d15-7b363dabd449" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="MINUTES"/>
+			</scheduling-strategy>
+		</scheduler>
+		<db:select doc:name="Select" doc:id="b0339df8-c8f6-4e75-ae18-3caece612443" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM deleted_users]]></db:sql>
+		</db:select>
+		<foreach doc:name="For Each" doc:id="c325f9cd-ed4e-404f-a1bc-eeaaa8316c0f" >
+			<salesforce:query doc:name="Query" doc:id="21568f06-9f27-4999-bf88-196825782dae" config-ref="Salesforce_Config">
+				<salesforce:salesforce-query ><![CDATA[SELECT Id FROM Employee__c where E_ID__c=:id]]></salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"id" : payload.E_ID
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<salesforce:delete doc:name="Delete" doc:id="fa29957b-192a-4422-98bd-e22c42125d67" config-ref="Salesforce_Config">
+				<salesforce:ids ><![CDATA[#[payload.Id]]]></salesforce:ids>
+			</salesforce:delete>
+			<logger level="INFO" doc:name="Logger" doc:id="8ca06e61-d887-450d-818e-4c7af60e3329" message="#[payload]"/>
+		</foreach>
+		<logger level="INFO" doc:name="Logger" doc:id="e72bc089-7b5a-455e-9a89-3d499ca9d493" />
+		<db:bulk-delete doc:name="Bulk delete" doc:id="1ddc8877-cd5d-4426-ba06-6db5436c44fa" config-ref="Database_Config">
+			<db:sql ><![CDATA[delete from deleted_users where E_ID=:E_ID]]></db:sql>
+		</db:bulk-delete>
+		<logger level="INFO" doc:name="Logger" doc:id="19ad01a4-62e4-460e-931b-4230c1c1dde7" />
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="50a7413a-0bbf-4306-9e9b-1c54baf4b723" type="SALESFORCE:INVALID_INPUT">
+				<set-payload value="#[error.description]" doc:name="Set Payload" doc:id="a68992e3-15ab-4085-9a85-dd9ae7db1caa" />
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="949e4156-4347-49a2-a087-77a8d2e3289f" type="DB:CONNECTIVITY">
+				<set-payload value="#[error.description]" doc:name="Set Payload" doc:id="e6d69682-d0ad-4a33-bcc9-6d8be24b4ccc" />
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="74fc7c38-c374-480f-8aec-09efd60a2ef9" type="SALESFORCE:CONNECTIVITY">
+				<set-payload value="#[error.description]" doc:name="Set Payload" doc:id="34059618-aae8-4eea-99dc-00eed47e626b" />
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="1bf37acb-d7d6-4c83-bca5-ef6f06f9e24d" type="SALESFORCE:LIMIT_EXCEEDED">
+				<set-payload value="#[error.description]" doc:name="Set Payload" doc:id="b10786f3-9330-44bd-9ba9-e455b1afff8c" />
+			</on-error-propagate>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="37c2bccd-ec24-4d0b-b769-38108e7c5300" type="ANY">
+				<set-payload value="#[error.description]" doc:name="Set Payload" doc:id="764acb0e-b49a-46ab-9e29-4fbd905e0545" />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>
