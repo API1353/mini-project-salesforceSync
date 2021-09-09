@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	
+	<flow name="salesforceFlow" doc:id="420098ba-d8af-4299-95a6-e33875dcd215" initialState="started">
+		<scheduler doc:name="Scheduler" doc:id="a6f8cf60-bb2d-4fcf-b8bc-a4cb43192286" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="MINUTES"/>
+			</scheduling-strategy>
+		</scheduler>
+		<db:select doc:name="Select" doc:id="7c30cbc9-2e2d-494a-bfea-77f2b38e6e8a" config-ref="Database_Config">
+			<db:sql ><![CDATA[select E_ID from temp]]></db:sql>
+		</db:select>
+		<logger level="INFO" doc:name="Logger" doc:id="a67f6c27-e6b0-4995-8390-30105767de43" message="#[payload]"/>
+		<foreach doc:name="For Each" doc:id="0bc75c1c-ca17-4d05-bc5e-e7e46a0ea14a" >
+			<salesforce:query doc:name="Query" doc:id="a0d907ac-86ac-4c90-b9b4-028053d0533f" config-ref="Salesforce_Config" >
+				<salesforce:salesforce-query ><![CDATA[Select Id from Employee__c where E_ID__c=:id]]></salesforce:salesforce-query>
+				<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"id" : payload.E_ID
+}]]]></salesforce:parameters>
+			</salesforce:query>
+			<salesforce:delete doc:name="Delete" doc:id="002de460-5860-4015-a48e-dca52a3f8dba" config-ref="Salesforce_Config" >
+				<salesforce:ids ><![CDATA[#[payload.Id]]]></salesforce:ids>
+			</salesforce:delete>
+			<logger level="INFO" doc:name="Logger" doc:id="7fe860be-f9be-46a6-a79f-658b881ffe63" />
+		</foreach>
+		<logger level="INFO" doc:name="Logger" doc:id="f569108e-6d61-4c6a-84fa-66d0feb29290" />
+		<db:bulk-delete doc:name="Bulk delete" doc:id="0f285fb1-bf9f-493d-a82d-3c2d64f0a57a" config-ref="Database_Config">
+			<db:sql ><![CDATA[delete from temp where E_ID=:E_ID]]></db:sql>
+		</db:bulk-delete>
+		<set-payload value="#[null]" doc:name="Set Payload" doc:id="4620e649-7df1-45e7-af6d-57348198db1f" />
+		<logger level="INFO" doc:name="Logger" doc:id="2e64c48a-2df3-4d91-9e4a-e25706d0652e" message="#[payload]"/>
+		<error-handler>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="c9a51e00-239c-47b9-9991-4b4e37d8d816" type="DB:CONNECTIVITY, DB:RETRY_EXHAUSTED, SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT">
+				<set-payload value='#["tejas" : error.description]' doc:name="Set Payload" doc:id="458e8713-8839-4f5d-8b98-1df290c90f56" />
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<flow name="UpsertFlow" doc:id="61d10986-fbb6-4f11-b4eb-f69ba3df5756" initialState="started">
+		<db:listener table="employee" doc:id="4b4cdd3d-e6cd-407f-aa91-066346ccf59d" config-ref="Database_Config" watermarkColumn="Modified_column">
+			<scheduling-strategy >
+				<fixed-frequency/>
+			</scheduling-strategy>
+		</db:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="0ca66b3f-f370-42cd-914d-c60b69e6ca7a" message="#[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="e8ed4631-883b-4930-af20-c08cc419ada8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Name: payload.E_NAME,
+	E_ID__c: payload.E_ID ,
+	E_SALARY__c: payload.E_SALARY,
+	E_PHONENUM__c: payload.E_PHONENUM as String
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:upsert doc:name="Upsert" doc:id="17adbef0-0e01-4999-8a22-b97fe7009e9f" config-ref="Salesforce_Config" objectType="Employee__c" externalIdFieldName="E_ID__c"/>
+		<logger level="INFO" doc:name="Logger" doc:id="65a4de58-43d9-46a9-97bb-7334d07e08ad" />
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="1e643d67-d5ee-43bb-b49f-c4cc8368d368" type="DB:RETRY_EXHAUSTED, SALESFORCE:CONNECTIVITY, SALESFORCE:INVALID_INPUT, SALESFORCE:LIMIT_EXCEEDED, SALESFORCE:MUTUAL_AUTHENTICATION_FAILED, SALESFORCE:NOT_FOUND" >
+				<logger level="INFO" doc:name="Logger" doc:id="38a3172e-54c4-480f-8aab-09951d09b3b4" message='#["tejas" : error.description]'/>
+			</on-error-propagate>
+		</error-handler>
+	
+</flow>
+</mule>

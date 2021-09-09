@@ -1,0 +1,14 @@
+http:
+  port: "8081"
+  
+sfdc:
+  username: "tejas.g@apisero.com"
+  password: "Sajet@07@2021"
+  token: "CyECP4lffCzNmpq6BCa7AGe3K"
+  
+  
+db:
+  port: "3306"
+  host: "localhost"
+  user: "root"
+  db: "employee"
